@@ -257,23 +257,23 @@ except:
     DB_URI = None
 if USER_SESSION_STRING:
     try:
-        with rss_session:
-            user = rss_session.get_me()
+        with app_session:
+            user = app_session.get_me()
             try:
                 if user.is_premium:
-                    TG_SPLIT_SIZE = 4194304000
-                    LOGGER.info("User is Premium Max Leech Limit is 4 GB")
+                    MAX_LEECH_SIZE = 4194304000
+                    LOGGER.info("User is Premium Max Leech Size is 4 GB")
                 else:
-                    TG_SPLIT_SIZE = 2097152000
-                    LOGGER.info("User is not Premium Max Leech Limit is 2 GB")
+                    MAX_LEECH_SIZE = 2097152000
+                    LOGGER.info("User is not Premium Max Leech Size is 2 GB")
             except Exception as e:
-             TG_SPLIT_SIZE = 2097152000
-             LOGGER.info(f"{e} Max Leech Limit is 2 GB")
+             MAX_LEECH_SIZE = 2097152000
+             LOGGER.info(f"{e} Max Leech Size is 2 GB")
     except Exception as e:
-        TG_SPLIT_SIZE = 2097152000
-        LOGGER.info(f"{e} Max Leech Limit is 2 GB")
+        MAX_LEECH_SIZE = 2097152000
+        LOGGER.info(f"{e} Max Leech Size is 2 GB")
 else:
-    TG_SPLIT_SIZE = 2097152000
+    MAX_LEECH_SIZE = 2097152000
     LOGGER.info(f"User Session String Was not provided Skipping Premium acc verification.")
 try:
     STATUS_LIMIT = getConfig('STATUS_LIMIT')
