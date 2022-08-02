@@ -356,20 +356,17 @@ class GoogleDriveHelper:
                 msg += f'\n<b>SubFolders: </b>{self.__total_folders}'
                 msg += f'\n<b>Files: </b>{self.__total_files}'
                 buttons = ButtonMaker()
-                durl = short_url(durl)
-                buttons.buildbutton("Drive Link", durl)
+                buttons.buildbutton("☁️ Drive Link", durl)
                 if INDEX_URL is not None:
                     url_path = rquote(f'{meta.get("name")}', safe='')
                     url = f'{INDEX_URL}/{url_path}/'
-                    url = short_url(url)
-                    buttons.buildbutton("Index Link", url)
+                    buttons.buildbutton("⚡ Index Link", url)
             else:
                 file = self.__copyFile(meta.get('id'), parent_id)
                 msg += f'<b>Name: </b><code>{file.get("name")}</code>'
                 durl = self.__G_DRIVE_BASE_DOWNLOAD_URL.format(file.get("id"))
                 buttons = ButtonMaker()
-                durl = short_url(durl)
-                buttons.buildbutton("Drive Link", durl)
+                buttons.buildbutton("☁️ Drive Link", durl)
                 if mime_type is None:
                     mime_type = 'File'
                 msg += f'\n\n<b>Size: </b>{get_readable_file_size(int(meta.get("size", 0)))}'
@@ -377,25 +374,24 @@ class GoogleDriveHelper:
                 if INDEX_URL is not None:
                     url_path = rquote(f'{file.get("name")}', safe='')
                     url = f'{INDEX_URL}/{url_path}'
-                    url = short_url(url)
-                    buttons.buildbutton("Index Link", url)
+                    buttons.buildbutton("⚡ Index Link", url)
                     if VIEW_LINK:
                         urls = f'{INDEX_URL}/{url_path}?a=view'
-                        urls = short_url(urls)
-                        buttons.buildbutton("View Link", urls)
+                        buttons.buildbutton("🌐 View Link", urls)
             if BUTTON_FOUR_NAME is not None and BUTTON_FOUR_URL is not None:
                 buttons.buildbutton(f"{BUTTON_FOUR_NAME}", f"{BUTTON_FOUR_URL}")
             if BUTTON_FIVE_NAME is not None and BUTTON_FIVE_URL is not None:
                 buttons.buildbutton(f"{BUTTON_FIVE_NAME}", f"{BUTTON_FIVE_URL}")
             if BUTTON_SIX_NAME is not None and BUTTON_SIX_URL is not None:
                 buttons.buildbutton(f"{BUTTON_SIX_NAME}", f"{BUTTON_SIX_URL}")
+            if SOURCE_LINK is True:
+                buttons.buildbutton(f"🔗 Source Link", link)
         except Exception as err:
             if isinstance(err, RetryError):
                 LOGGER.info(f"Total Attempts: {err.last_attempt.attempt_number}")
                 err = err.last_attempt.exception()
             err = str(err).replace('>', '').replace('<', '')
-            exception_name = err.__class__.__name__
-            LOGGER.error(f"{err}. Exception Name: {exception_name}")
+            LOGGER.error(err)
             if "User rate limit exceeded" in str(err):
                 msg = "User rate limit exceeded."
             elif "File not found" in str(err):
