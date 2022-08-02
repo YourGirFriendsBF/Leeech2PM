@@ -135,6 +135,29 @@ AS_DOC_USERS = set()
 AS_MEDIA_USERS = set()
 EXTENSION_FILTER = set()
 LEECH_LOG = set()
+MIRROR_LOG = set()
+try:
+    aid = getConfig('AUTHORIZED_CHATS')
+    aid = aid.split(' ')
+    for _id in aid:
+        AUTHORIZED_CHATS.add(int(_id))
+except:
+    pass
+try:
+    aid = getConfig('SUDO_USERS')
+    aid = aid.split(' ')
+    for _id in aid:
+        SUDO_USERS.add(int(_id))
+except:
+    pass
+try:
+    fx = getConfig('EXTENTION_FILTER')
+    if len(fx) > 0:
+        fx = fx.split(' ')
+        for x in fx:
+            EXTENTION_FILTER.add(x.lower())
+except:
+    pass
 try:
     aid = getConfig('LEECH_LOG')
     aid = aid.split(' ')
@@ -143,30 +166,10 @@ try:
 except:
     pass
 try:
-    BOT_PM = getConfig('BOT_PM')
-    BOT_PM = BOT_PM.lower() == 'true'
-except KeyError:
-    BOT_PM = False
-try:
-    aid = getConfig('AUTHORIZED_CHATS')
-    aid = aid.split()
+    aid = getConfig('MIRROR_LOGS')
+    aid = aid.split(' ')
     for _id in aid:
-        AUTHORIZED_CHATS.add(int(_id.strip()))
-except:
-    pass
-try:
-    aid = getConfig('SUDO_USERS')
-    aid = aid.split()
-    for _id in aid:
-        SUDO_USERS.add(int(_id.strip()))
-except:
-    pass
-try:
-    fx = getConfig('EXTENSION_FILTER')
-    if len(fx) > 0:
-        fx = fx.split()
-        for x in fx:
-            EXTENSION_FILTER.add(x.strip().lower())
+        MIRROR_LOGS.add(int(_id))
 except:
     pass
 try:
