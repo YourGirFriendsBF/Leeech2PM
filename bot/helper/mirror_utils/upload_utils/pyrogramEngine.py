@@ -7,7 +7,7 @@ from threading import RLock
 from pyrogram import Client, enums
 
 from bot import DOWNLOAD_DIR, AS_DOCUMENT, AS_DOC_USERS, AS_MEDIA_USERS, CUSTOM_FILENAME, \
-                 EXTENTION_FILTER, app, LEECH_LOG, BOT_PM, app_session, MAX_LEECH_SIZE
+                 EXTENTION_FILTER, app, LEECH_LOG, BOT_PM, MAX_LEECH_SIZE
 from bot.helper.ext_utils.fs_utils import take_ss, get_media_info, get_path_size
 from bot.helper.ext_utils.bot_utils import get_readable_file_size
 LOGGER = getLogger(__name__)
