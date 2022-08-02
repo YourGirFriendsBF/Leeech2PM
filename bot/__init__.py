@@ -456,6 +456,12 @@ try:
         raise KeyError
 except:
     CUSTOM_FILENAME = None
+    
+try:
+    SOURCE_LINK = getConfig('SOURCE_LINK')
+    SOURCE_LINK = SOURCE_LINK.lower() == 'true'
+except KeyError:
+    SOURCE_LINK = False    
 try:
     CRYPT = getConfig('CRYPT')
     if len(CRYPT) == 0:
