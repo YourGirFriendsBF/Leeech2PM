@@ -37,7 +37,7 @@ from bot.helper.telegram_helper.message_utils import sendMessage, sendMarkup, de
                                                         auto_delete_message, auto_delete_upload_message
 from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.ext_utils.db_handler import DbManger
-from bot.helper.ext_utils.telegraph_helper import 
+from bot.helper.ext_utils.telegraph_helper import telegraph
 
 
 class MirrorListener:
