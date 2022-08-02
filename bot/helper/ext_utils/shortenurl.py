@@ -1,53 +1,127 @@
-# Implemented by https://github.com/junedkh
+from logging import getLogger, WARNING
+from time import time
+from threading import RLock, Lock
 
-from random import random, choice
+from bot import LOGGER, download_dict, download_dict_lock, STOP_DUPLICATE, STORAGE_THRESHOLD, app
+from bot.helper.ext_utils.bot_utils import get_readable_file_size
+from ..status_utils.telegram_download_status import TelegramDownloadStatus
+from bot.helper.telegram_helper.message_utils import sendMarkup, sendMessage, sendStatusMessage
+from bot.helper.mirror_utils.upload_utils.gdriveTools import GoogleDriveHelper
+from bot.helper.ext_utils.fs_utils import check_storage_threshold
 
-from cfscrape import create_scraper
-from base64 import b64encode
-from urllib.parse import quote, unquote
-from urllib3 import disable_warnings
-
-from bot import LOGGER, SHORTENER, SHORTENER_API
+global_lock = Lock()
+GLOBAL_GID = set()
+getLogger("pyrogram").setLevel(WARNING)
 
 
-def short_url(longurl):
-    if SHORTENER is None and SHORTENER_API is None:
-        return longurl
-    try:
-        cget = create_scraper().get
+class TelegramDownloadHelper:
+
+    def __init__(self, listener):
+        self.name = ""
+        self.size = 0
+        self.progress = 0
+        self.downloaded_bytes = 0
+        self.__start_time = time()
+        self.__listener = listener
+        self.__id = ""
+        self.__is_cancelled = False
+        self.__resource_lock = RLock()
+
+    @property
+    def download_speed(self):
+        with self.__resource_lock:
+            return self.downloaded_bytes / (time() - self.__start_time)
+
+    def __onDownloadStart(self, name, size, file_id):
+        with global_lock:
+            GLOBAL_GID.add(file_id)
+        with self.__resource_lock:
+            self.name = name
+            self.size = size
+            self.__id = file_id
+        with download_dict_lock:
+            download_dict[self.__listener.uid] = TelegramDownloadStatus(self, self.__listener, self.__id)
+        self.__listener.onDownloadStart()
+        sendStatusMessage(self.__listener.message, self.__listener.bot)
+
+    def __onDownloadProgress(self, current, total):
+        if self.__is_cancelled:
+            app.stop_transmission()
+            return
+        with self.__resource_lock:
+            self.downloaded_bytes = current
+            try:
+                self.progress = current / self.size * 100
+            except ZeroDivisionError:
+                pass
+
+    def __onDownloadError(self, error):
+        with global_lock:
+            try:
+                GLOBAL_GID.remove(self.__id)
+            except:
+                pass
+        self.__listener.onDownloadError(error)
+
+    def __onDownloadComplete(self):
+        with global_lock:
+            GLOBAL_GID.remove(self.__id)
+        self.__listener.onDownloadComplete()
+
+    def __download(self, message, path):
         try:
-            unquote(longurl).encode('ascii')
-            if "{" in unquote(longurl) or "}" in unquote(longurl):
-                raise TypeError
-        except (UnicodeEncodeError, TypeError):
-            longurl = cget('http://tinyurl.com/api-create.php', params=dict(url=longurl)).text
-        if "shorte.st" in SHORTENER:
-            disable_warnings()
-            return cget(f'http://api.shorte.st/stxt/{SHORTENER_API}/{longurl}', verify=False).text
-        elif "linkvertise" in SHORTENER:
-            url = quote(b64encode(longurl.encode("utf-8")))
-            linkvertise = [
-                f"https://link-to.net/{SHORTENER_API}/{random() * 1000}/dynamic?r={url}",
-                f"https://up-to-down.net/{SHORTENER_API}/{random() * 1000}/dynamic?r={url}",
-                f"https://direct-link.net/{SHORTENER_API}/{random() * 1000}/dynamic?r={url}",
-                f"https://file-link.net/{SHORTENER_API}/{random() * 1000}/dynamic?r={url}"]
-            return choice(linkvertise)
-        elif "bitly.com" in SHORTENER:
-            shorten_url = "https://api-ssl.bit.ly/v4/shorten"
-            headers = {"Authorization": f"Bearer {SHORTENER_API}"}
-            response = create_scraper().post(shorten_url, json={"long_url": longurl}, headers=headers).json()
-            return response["link"]
-        elif "ouo.io" in SHORTENER:
-            disable_warnings()
-            return cget(f'http://ouo.io/api/{SHORTENER_API}?s={longurl}', verify=False).text
-        elif "adfoc.us" in SHORTENER:
-            disable_warnings()
-            return cget(f'http://adfoc.us/api/?key={SHORTENER_API}&url={longurl}', verify=False).text
-        elif "cutt.ly" in SHORTENER:
-            disable_warnings()
-            return cget(f'http://cutt.ly/api/api.php?key={SHORTENER_API}&short={longurl}', verify=False).json()['url']['shortLink']
+            download = message.download(file_name=path, progress=self.__onDownloadProgress)
+        except Exception as e:
+            LOGGER.error(str(e))
+            return self.__onDownloadError(str(e))
+        if download is not None:
+            self.__onDownloadComplete()
+        elif not self.__is_cancelled:
+            self.__onDownloadError('Internal error occurred')
+
+    def add_download(self, message, path, filename):
+        _dmsg = app.get_messages(message.chat.id, reply_to_message_ids=message.message_id)
+        media = None
+        media_array = [_dmsg.document, _dmsg.video, _dmsg.audio]
+        for i in media_array:
+            if i is not None:
+                media = i
+                break
+        if media is not None:
+            with global_lock:
+                # For avoiding locking the thread lock for long time unnecessarily
+                download = media.file_unique_id not in GLOBAL_GID
+            if filename == "":
+                name = media.file_name
+            else:
+                name = filename
+                path = path + name
+
+            if download:
+                size = media.file_size
+                if STOP_DUPLICATE and not self.__listener.isLeech:
+                    LOGGER.info('Checking File/Folder if already in Drive...')
+                    smsg, button = GoogleDriveHelper().drive_list(name, True, True)
+                    if smsg:
+                        msg = "File/Folder is already available in Drive.\nHere are the search results:"
+                        self.__listener()
+                        return sendMarkup(msg, self.__listener.bot, self.__listener.message, button)
+                if STORAGE_THRESHOLD is not None:
+                    arch = any([self.__listener.isZip, self.__listener.extract])
+                    acpt = check_storage_threshold(size, arch)
+                    if not acpt:
+                        msg = f'You must leave {STORAGE_THRESHOLD}GB free storage.'
+                        msg += f'\nYour File/Folder size is {get_readable_file_size(size)}'
+                        return sendMessage(msg, self.__listener.bot, self.__listener.message)
+                self.__onDownloadStart(name, size, media.file_unique_id)
+                LOGGER.info(f'Downloading Telegram file with id: {media.file_unique_id}')
+                self.__download(_dmsg, path)
+            else:
+                self.__onDownloadError('File already being downloaded!')
         else:
-            return cget(f'https://{SHORTENER}/api?api={SHORTENER_API}&url={quote(longurl)}&format=text').text
-    except Exception as e:
-        LOGGER.error(e)
-        return longurl
+            self.__onDownloadError('No document in the replied message')
+
+    def cancel_download(self):
+        LOGGER.info(f'Cancelling download on user request: {self.__id}')
+        self.__is_cancelled = True
+        self.__onDownloadError('Cancelled by user!')
