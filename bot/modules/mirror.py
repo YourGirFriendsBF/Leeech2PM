@@ -39,7 +39,6 @@ from bot.helper.telegram_helper.button_build import ButtonMaker
 from bot.helper.ext_utils.db_handler import DbManger
 from bot.helper.ext_utils.telegraph_helper import telegraph
 
-
 class MirrorListener:
     def __init__(self, bot, message, isZip=False, extract=False, isQbit=False, isLeech=False, pswd=None, tag=None):
         self.bot = bot
@@ -52,6 +51,8 @@ class MirrorListener:
         self.pswd = pswd
         self.tag = tag
         self.isPrivate = self.message.chat.type in ['private', 'group']
+        self.user_id = self.message.from_user.id
+        reply_to = self.message.reply_to_message
 
     def clean(self):
         try:
@@ -83,19 +84,19 @@ class MirrorListener:
                 path = m_path + ".zip"
                 LOGGER.info(f'Zip: orig_path: {m_path}, zip_path: {path}')
                 if self.pswd is not None:
-                    if self.isLeech and int(size) > TG_SPLIT_SIZE:
-                        srun(["7z", f"-v{TG_SPLIT_SIZE}b", "a", "-mx=0", f"-p{self.pswd}", path, m_path])
+                    if self.isLeech and int(size) > MAX_LEECH_SIZE:
+                        srun(["7z", f"-v{MAX_LEECH_SIZE}b", "a", "-mx=0", f"-p{self.pswd}", path, m_path])
                     else:
                         srun(["7z", "a", "-mx=0", f"-p{self.pswd}", path, m_path])
-                elif self.isLeech and int(size) > TG_SPLIT_SIZE:
-                    srun(["7z", f"-v{TG_SPLIT_SIZE}b", "a", "-mx=0", path, m_path])
+                elif self.isLeech and int(size) > MAX_LEECH_SIZE:
+                    srun(["7z", f"-v{MAX_LEECH_SIZE}b", "a", "-mx=0", path, m_path])
                 else:
                     srun(["7z", "a", "-mx=0", path, m_path])
             except FileNotFoundError:
                 LOGGER.info('File to archive not found!')
                 self.onUploadError('Internal error occurred!!')
                 return
-            if not self.isQbit or not QB_SEED or self.isLeech:
+            if self.isLeech:
                 try:
                     rmtree(m_path)
                 except:
@@ -106,11 +107,11 @@ class MirrorListener:
                     path = get_base_name(m_path)
                 LOGGER.info(f"Extracting: {name}")
                 with download_dict_lock:
-                    download_dict[self.uid] = ExtractStatus(name, m_path, size)
+                    download_dict[self.uid] = ExtractStatus(name, m_path, size, self.message)
                 if ospath.isdir(m_path):
                     for dirpath, subdir, files in walk(m_path, topdown=False):
                         for file_ in files:
-                            if file_.endswith((".zip", ".7z")) or re_search(r'\.part0*1\.rar$|\.7z\.0*1$|\.zip\.0*1$', file_) \
+                            if file_.endswith(".zip") or re_search(r'\.part0*1\.rar$|\.7z\.0*1$|\.zip\.0*1$', file_) \
                                or (file_.endswith(".rar") and not re_search(r'\.part\d+\.rar$', file_)):
                                 m_path = ospath.join(dirpath, file_)
                                 if self.pswd is not None:
@@ -120,7 +121,7 @@ class MirrorListener:
                                 if result.returncode != 0:
                                     LOGGER.error('Unable to extract archive!')
                         for file_ in files:
-                            if file_.endswith((".rar", ".zip", ".7z")) or re_search(r'\.r\d+$|\.7z\.\d+$|\.z\d+$|\.zip\.\d+$', file_):
+                            if file_.endswith((".rar", ".zip")) or re_search(r'\.r\d+$|\.7z\.\d+$|\.z\d+$|\.zip\.\d+$', file_):
                                 del_path = ospath.join(dirpath, file_)
                                 osremove(del_path)
                     path = f'{DOWNLOAD_DIR}{self.uid}/{name}'
@@ -148,13 +149,13 @@ class MirrorListener:
                 for file_ in files:
                     f_path = ospath.join(dirpath, file_)
                     f_size = ospath.getsize(f_path)
-                    if int(f_size) > TG_SPLIT_SIZE:
+                    if int(f_size) > MAX_LEECH_SIZE:
                         if not checked:
                             checked = True
                             with download_dict_lock:
                                 download_dict[self.uid] = SplitStatus(up_name, up_path, size)
                             LOGGER.info(f"Splitting: {up_name}")
-                        split_file(f_path, f_size, file_, dirpath, TG_SPLIT_SIZE)
+                        split_file(f_path, f_size, file_, dirpath, MAX_LEECH_SIZE)
                         osremove(f_path)
         if self.isLeech:
             size = get_path_size(f'{DOWNLOAD_DIR}{self.uid}')
@@ -176,6 +177,13 @@ class MirrorListener:
             drive.upload(up_name)
 
     def onDownloadError(self, error):
+        reply_to = self.message.reply_to_message
+        if reply_to is not None:
+            try:
+                reply_to.delete()
+            except Exception as error:
+                LOGGER.warning(error)
+                pass
         error = error.replace('<', ' ').replace('>', ' ')
         clean_download(f'{DOWNLOAD_DIR}{self.uid}')
         with download_dict_lock:
