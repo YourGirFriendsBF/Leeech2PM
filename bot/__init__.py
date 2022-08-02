@@ -135,7 +135,7 @@ AS_DOC_USERS = set()
 AS_MEDIA_USERS = set()
 EXTENSION_FILTER = set()
 LEECH_LOG = set()
-MIRROR_LOG = set()
+MIRROR_LOGS = set()
 try:
     aid = getConfig('AUTHORIZED_CHATS')
     aid = aid.split(' ')
