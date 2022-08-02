@@ -41,7 +41,6 @@ class TgUploader:
         self.__app = app
         self.__user_id = listener.message.from_user.id
         self.isPrivate = listener.message.chat.type in ['private', 'group']
-        self.__user_session = rss_session
         self.__Premium = app.get_me().is_premium
         self.__Chat_id = self.__listener.message.chat.id
     def upload(self):
